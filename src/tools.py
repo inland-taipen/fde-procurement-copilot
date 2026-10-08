@@ -113,7 +113,7 @@ def check_required_fields(request_id: str) -> dict:
 def check_budget(request_id: str) -> dict:
     """Deterministic budget check: annual cost vs department's available budget."""
     ctx = get_request_context(request_id)["data"]
-    cost = req_cost = ctx["request"].get("annual_cost_usd")
+    cost = ctx["request"].get("annual_cost_usd")
     available = ctx["budget"]["available_usd"]
     dept = ctx["requester"]["department"]
     if cost is None:
@@ -129,14 +129,14 @@ def check_budget(request_id: str) -> dict:
                 )
             ],
         }
-    within = req_cost <= available
+    within = cost <= available
     return {
         "tool": "check_budget",
-        "data": {"within_budget": within, "cost": req_cost, "available_usd": available},
+        "data": {"within_budget": within, "cost": cost, "available_usd": available},
         "evidence": [
             _ev(
                 "policy_check",
-                f"Annual cost ${req_cost:,} is "
+                f"Annual cost ${cost:,} is "
                 f"{'within' if within else 'ABOVE'} the {dept} available budget "
                 f"of ${available:,}",
                 "procurement_policy.md section 2",

@@ -1,0 +1,21 @@
+case_id,architecture,correct_next_action,grounded_evidence,policy_followed,human_escalation_correct,latency_ms,llm_calls,tool_calls,notes
+PUB-01,single,yes,yes,yes,yes,21526,3,8,Manager-only path; evidence cites request + budget + catalog rows
+PUB-02,single,yes,yes,yes,yes,18257,3,8,Overlap + new-vendor legal + security not_completed all surfaced
+PUB-03,single,yes,yes,yes,yes,150902,3,8,Latency spike = free-tier retry wait; source_code security required
+PUB-04,single,yes,yes,yes,yes,17070,3,8,Budget shortfall + PII + out-of-region + new vendor all caught
+PUB-05,single,yes,yes,yes,yes,217838,4,8,Retry wait; injection ignored + flagged; 3 missing fields listed
+PUB-06,single,yes,yes,yes,yes,19324,3,8,503 handled -> vendor_risk_unavailable; no favourable inference
+PUB-01,staged,yes,yes,yes,yes,25420,2,8,Same outcome as single at 2 LLM calls
+PUB-02,staged,yes,yes,yes,yes,14094,2,8,Same outcome as single
+PUB-03,staged,yes,yes,yes,yes,17147,2,8,Same outcome as single
+PUB-04,staged,yes,yes,yes,yes,155132,2,8,Latency spike = free-tier retry wait
+PUB-05,staged,yes,yes,yes,yes,15577,2,8,Injection flagged by keyword screen + analyst judgment
+PUB-06,staged,yes,yes,yes,yes,18661,2,8,Same outcome as single
+MANUAL-1004,single,yes,yes,yes,yes,,3,8,Added legal_review_required (customer-PII AI) - additive caution
+MANUAL-1007,single,yes,yes,yes,yes,,3,8,Expired review + registry conflict both surfaced
+MANUAL-1008,single,yes,yes,yes,yes,,3,8,Existing company-wide TaskFlow seats surfaced as better path
+MANUAL-1010,single,yes,yes,yes,yes,,3,8,Clean Manager-only happy path
+MANUAL-1004,staged,yes,yes,yes,yes,,2,8,Limited-use AI + customer PII -> security + privacy
+MANUAL-1007,staged,yes,yes,yes,yes,,2,8,Expired review + registry conflict both surfaced
+MANUAL-1008,staged,yes,yes,yes,yes,,2,8,Correctly recommends reusing existing TaskFlow capacity
+MANUAL-1010,staged,yes,yes,yes,yes,,2,8,Manager only; added soft privacy note on a no-data request
