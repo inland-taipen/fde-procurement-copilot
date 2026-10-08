@@ -140,6 +140,21 @@ Request -> Understand -> Gather evidence -> Deterministic checks
 
 Start with a thin vertical slice. Get Architecture A working before building Architecture B.
 
+## Implementation
+
+Deterministic-first, LLM-last: `src/tools.py` (8 evidence tools),
+`src/rules.py` (policy engine + merge validator; reference date 2026-09-30),
+`src/agents.py` (both architectures over the shared core, raw `google-genai`
+with structured output + tool declarations, per-model quota fallback).
+
+- `architecture="staged"` - collect -> analyst -> writer, exactly 2 LLM calls
+- `architecture="single"` - one agentic tool loop (~3-4 LLM calls)
+
+LLM output can only add caution; derived approvals/flags are the floor and
+`human_review_required` is always true. See `templates/workflow_notes.md`
+for the diagram and `templates/architecture_decision.md` for the ship
+decision. Offline core check: `python -m unittest tests.test_rulings`.
+
 ## Useful files
 
 - `docs/Assignment_3_Brief.pdf` - assignment brief

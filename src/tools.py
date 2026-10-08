@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 
+import pandas as pd
 import requests
 
 from src.contracts import EvidenceItem
@@ -209,24 +210,28 @@ def lookup_vendor_registry(request_id: str) -> dict:
             ],
         }
     row = rows.iloc[0]
+    # empty CSV cells arrive as NaN (truthy); normalise to None so nothing
+    # downstream mistakes them for data or emits invalid JSON
+    data = {
+        key: (None if pd.isna(row[key]) else row[key])
+        for key in (
+            "procurement_status",
+            "security_status",
+            "security_review_date",
+            "legal_terms_status",
+            "notes",
+        )
+    }
     return {
         "tool": "lookup_vendor_registry",
-        "data": {
-            "in_registry": True,
-            "vendor_name": vendor,
-            "procurement_status": row["procurement_status"],
-            "security_status": row["security_status"],
-            "security_review_date": row["security_review_date"] or None,
-            "legal_terms_status": row["legal_terms_status"],
-            "notes": row["notes"],
-        },
+        "data": {"in_registry": True, "vendor_name": vendor, **data},
         "evidence": [
             _ev(
                 "vendors.csv",
-                f"Registry: {vendor} procurement={row['procurement_status']}, "
-                f"security={row['security_status']} "
-                f"(review date {row['security_review_date'] or 'none'}), "
-                f"legal terms={row['legal_terms_status']}",
+                f"Registry: {vendor} procurement={data['procurement_status']}, "
+                f"security={data['security_status']} "
+                f"(review date {data['security_review_date'] or 'none'}), "
+                f"legal terms={data['legal_terms_status']}",
                 row["vendor_id"],
             )
         ],

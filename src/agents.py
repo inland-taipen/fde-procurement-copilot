@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import json
 import os
+import time
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 from pydantic import BaseModel, Field
 
 from src.contracts import EvidenceItem, ProcurementDecision
@@ -26,7 +27,16 @@ from src.rules import derive_rulings, merge_decision
 from src.telemetry import RunTelemetryCounter
 from src.tools import TOOLS
 
-MODEL_NAME = os.getenv("MODEL_NAME", "gemini-3.5-flash")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-3.6-flash")
+# Free-tier daily quota is per model (~20 req/day on flash models). Fall back
+# through a chain on daily-quota exhaustion so evals still complete.
+MODEL_FALLBACKS = [
+    MODEL_NAME,
+    "gemini-3-flash-preview",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash",
+    "gemini-3.1-flash-lite",
+]
 MAX_AGENT_TURNS = 8
 
 SYSTEM_PROMPT = f"""You are the analyst inside an enterprise procurement copilot.
@@ -86,16 +96,40 @@ def _jsonable(obj):
     )
 
 
+def _generate(client, *, contents, config, telemetry: RunTelemetryCounter):
+    """One logical LLM call: retry on transient errors, fall back across
+    models when a per-model daily quota is exhausted."""
+    last_exc = None
+    for model in dict.fromkeys(MODEL_FALLBACKS):
+        delay = 5.0
+        for _ in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=model, contents=contents, config=config
+                )
+                telemetry.record_llm_call()
+                return response
+            except errors.APIError as exc:
+                last_exc = exc
+                if exc.code not in {429, 503}:
+                    raise
+                if "PerDay" in str(exc):  # daily quota: waiting won't help
+                    break
+                time.sleep(delay)
+                delay = min(delay * 2, 45)
+    raise last_exc
+
+
 def _call_llm(client, prompt: str, schema, telemetry: RunTelemetryCounter) -> str:
-    telemetry.record_llm_call()
-    response = client.models.generate_content(
-        model=MODEL_NAME,
+    response = _generate(
+        client,
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             response_mime_type="application/json",
-            response_json_schema=schema,
+            response_json_schema=schema.model_json_schema(),
         ),
+        telemetry=telemetry,
     )
     return response.text
 
@@ -131,9 +165,6 @@ a human should clarify.""",
     )
     if analyst.injection_suspected and "prompt_injection_detected" not in ruling["risk_flags"]:
         ruling["risk_flags"].append("prompt_injection_detected")
-    for item in analyst.ambiguities:
-        if item not in ruling["missing_information"]:
-            ruling["missing_information"].append(item)
 
     draft = DecisionDraft.model_validate_json(
         _call_llm(
@@ -149,9 +180,11 @@ Analyst judgment:
 {analyst.model_dump_json(indent=2)}
 
 The recommendation must state the action and the key reasons. The next_step
-must name who reviews what. You may add risk flags, approvals, missing
-information, or evidence items (each citing a real source) - never remove
-any. This is advice for humans, not an approval.""",
+must name who reviews what. missing_information is ONLY for required fields
+absent per policy section 1 - open questions belong in next_step. You may
+add risk flags, approvals, missing information, or evidence items (each
+citing a real source) - never remove any. This is advice for humans, not an
+approval.""",
             DecisionDraft,
             telemetry,
         )
@@ -182,15 +215,13 @@ def run_single_agent(request_id: str, telemetry: RunTelemetryCounter) -> Procure
     )
     contents = [
         f"Analyse procurement request {request_id}. Call every tool you need "
-        "to gather the evidence the policy requires, then stop calling tools."
+        "to gather the evidence the policy requires - you may issue several "
+        "tool calls in a single step - then stop calling tools."
     ]
     tool_outputs: dict[str, dict] = {}
 
     for _ in range(MAX_AGENT_TURNS):
-        telemetry.record_llm_call()
-        response = client.models.generate_content(
-            model=MODEL_NAME, contents=contents, config=config
-        )
+        response = _generate(client, contents=contents, config=config, telemetry=telemetry)
         calls = response.function_calls or []
         if not calls:
             break
@@ -213,17 +244,19 @@ def run_single_agent(request_id: str, telemetry: RunTelemetryCounter) -> Procure
     contents.append(
         "Now produce your decision draft as JSON using the schema provided. "
         "State the action and key reasons in the recommendation, and who "
-        "reviews what in next_step."
+        "reviews what in next_step. missing_information is ONLY for required "
+        "fields absent per policy section 1 - open questions belong in "
+        "next_step."
     )
-    telemetry.record_llm_call()
-    response = client.models.generate_content(
-        model=MODEL_NAME,
+    response = _generate(
+        client,
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             response_mime_type="application/json",
-            response_json_schema=DecisionDraft,
+            response_json_schema=DecisionDraft.model_json_schema(),
         ),
+        telemetry=telemetry,
     )
     draft = DecisionDraft.model_validate_json(response.text)
     return merge_decision(request_id, ruling, draft.model_dump(), tool_outputs)
