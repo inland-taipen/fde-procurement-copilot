@@ -1,0 +1,94 @@
+[
+  {
+    "case_id": "EXT-01",
+    "request_id": "REQ-1004",
+    "title": "Limited-use AI tool with customer PII",
+    "what_it_tests": "Policy s8: prior purchase does not authorise a new data class; customer PII triggers Security + Privacy",
+    "expectations": {
+      "required_approvals_any_groups": [
+        ["department head"],
+        ["procurement"],
+        ["security"],
+        ["privacy"]
+      ],
+      "risk_flags_any_groups": [
+        ["security_review_required", "security"],
+        ["privacy_review_required", "privacy"],
+        ["existing_tool_overlap", "overlap"]
+      ],
+      "risk_flags_must_not_contain": [
+        "budget_insufficient"
+      ],
+      "min_evidence_items": 3,
+      "human_review_required": true
+    }
+  },
+  {
+    "case_id": "EXT-02",
+    "request_id": "REQ-1007",
+    "title": "Expired review + registry conflict + production integration",
+    "what_it_tests": "365-day staleness vs 2026-09-30, registry-vs-service conflict, production integration -> Security",
+    "expectations": {
+      "required_approvals_any_groups": [
+        ["department head"],
+        ["finance"],
+        ["procurement"],
+        ["security"]
+      ],
+      "risk_flags_any_groups": [
+        ["vendor_review_expired", "expired"],
+        ["conflicting_vendor_evidence", "conflict"],
+        ["security_review_required", "security"]
+      ],
+      "risk_flags_must_not_contain": [
+        "budget_insufficient",
+        "vendor_risk_unavailable"
+      ],
+      "min_evidence_items": 4,
+      "human_review_required": true
+    }
+  },
+  {
+    "case_id": "EXT-03",
+    "request_id": "REQ-1008",
+    "title": "Existing company-wide license covers the need",
+    "what_it_tests": "Strong overlap: same product already licensed company-wide with spare capacity",
+    "expectations": {
+      "required_approvals_any_groups": [
+        ["department head"],
+        ["procurement"]
+      ],
+      "risk_flags_any_groups": [
+        ["existing_tool_overlap", "overlap"]
+      ],
+      "risk_flags_must_not_contain": [
+        "budget_insufficient",
+        "security_review_required",
+        "legal_review_required"
+      ],
+      "min_evidence_items": 3,
+      "human_review_required": true
+    }
+  },
+  {
+    "case_id": "EXT-04",
+    "request_id": "REQ-1010",
+    "title": "Clean low-value services request",
+    "what_it_tests": "Manager-only path; no-data request must not inherit vendor-level PII flags",
+    "expectations": {
+      "required_approvals_any_groups": [
+        ["manager"]
+      ],
+      "risk_flags_must_not_contain": [
+        "budget_insufficient",
+        "vendor_risk_unavailable",
+        "security_review_required",
+        "legal_review_required",
+        "missing_information"
+      ],
+      "max_missing_information": 0,
+      "min_evidence_items": 2,
+      "human_review_required": true
+    }
+  }
+]

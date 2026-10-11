@@ -11,22 +11,21 @@ Both architectures share one deterministic core: `src/tools.py` (8 tools,
 (policy engine + a merge validator that unions model output with the code
 ruling and forces `human_review_required`). Only the LLM's role differs.
 
-Results from `evals/run_public_evals.py` on the six public cases:
+Results from `evals/run_public_evals.py` (6 public cases plus
+`extended_cases.json`, 4 cases I wrote policy expectations for myself):
 
 | Metric | Single agent | Staged / 2-agent |
 |---|---:|---:|
-| Cases passing minimum checks | 6/6 | 6/6 |
-| Avg latency (ms)* | 74,148 | 41,000 |
-| Median latency (ms) | 20,421 | 17,904 |
-| Avg LLM calls | 3.2 | 2.0 |
+| Cases passing minimum checks | 10/10 | 10/10 |
+| Median latency (ms, public) | 20,421 | 17,904 |
+| Avg LLM calls | ~3.2 | 2.0 |
 | Avg tool calls | 8.0 | 8.0 |
-| Policy failures found manually | 0 | 0 |
+| Policy failures found | 0 | 0 |
 
-*Latency includes free-tier 429/503 retry waits; medians are the honest
-comparison. Manual review of the four non-public requests (REQ-1004/1007/
-1008/1010) found correct behaviour from both, including the
-registry-vs-service conflict on SignalWatch and graceful degradation on the
-NimbusAI 503.
+Latency includes free-tier 429/503 retry waits; medians are the honest
+comparison. When the model was made unreachable, both degraded to a
+rules-only decision flagged `llm_unavailable` - the deterministic core is
+policy-complete on its own.
 
 ## Trade-offs
 
@@ -41,8 +40,8 @@ guaranteed rather than model-dependent.
 
 ## Risks / limitations
 
-- Six public + four manual cases is a thin evidence base; hidden cases may
-  stress ambiguous categories and paraphrased injections.
+- Ten cases is still a thin evidence base; hidden cases may stress
+  ambiguous categories and paraphrased injections.
 - The injection screen is a keyword heuristic backed by an LLM judgment;
   sophisticated paraphrase could evade both - but injected text can never
   grant an approval, since approvals are computed in code.

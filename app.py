@@ -39,7 +39,24 @@ with right:
             st.exception(exc)
         else:
             payload = result.model_dump() if hasattr(result, "model_dump") else result
-            st.json(payload)
+            st.markdown(f"**{payload['recommendation']}**")
+            if payload["missing_information"]:
+                st.warning("Missing: " + "; ".join(payload["missing_information"]))
+            flags_col, approvals_col = st.columns(2)
+            flags_col.markdown("**Risk flags**")
+            flags_col.write(" · ".join(f"`{f}`" for f in payload["risk_flags"]) or "none")
+            approvals_col.markdown("**Required approvals**")
+            approvals_col.write(" → ".join(payload["required_approvals"]) or "none")
+            st.markdown("**Evidence**")
+            st.dataframe(payload["evidence"], hide_index=True, use_container_width=True)
+            st.info("Next step: " + payload["next_step"])
+            tel = payload.get("telemetry") or {}
+            st.caption(
+                f"human review required: {payload['human_review_required']}  ·  "
+                f"LLM calls: {tel.get('llm_calls', '-')}  ·  "
+                f"tool calls: {tel.get('tool_calls', '-')}  ·  "
+                f"tools: {', '.join(tel.get('tool_names') or []) or '-'}"
+            )
     else:
         st.info("Connect this panel to your implementation in `src/solution.py`.")
 

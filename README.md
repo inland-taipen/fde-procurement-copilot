@@ -175,18 +175,23 @@ right.
 - Overlap is vendor/product/category equality in the catalog; it surfaces
   an existing option, never auto-rejects.
 
-### Evaluation results (`evals/results_*.csv`, 6 public cases)
+### Evaluation results
 
 | Metric | Single agent | Staged / 2-agent |
 |---|---:|---:|
-| Cases passing minimum checks | 6/6 | 6/6 |
-| Median latency | ~20.4 s | ~17.9 s |
-| Avg LLM calls | 3.2 | 2.0 |
-| Avg tool calls | 8.0 | 8.0 |
+| Public cases passing (6) | 6/6 | 6/6 |
+| Extended cases passing (4) | 4/4 | 4/4 |
+| Avg LLM calls | ~3.2 | 2.0 |
+| Tool calls per case | 8 | 8 |
 
-Averages include free-tier quota retry waits. Four non-public requests
-(REQ-1004/1007/1008/1010) were also reviewed manually on both - see
-`evals/evaluation_results.csv`.
+`python evals/run_public_evals.py --architecture staged` (public set) and
+`--cases evals/extended_cases.json` (4 extra requests I wrote expectations
+for myself - REQ-1004/1007/1008/1010). Full table:
+`evals/evaluation_results.csv`; raw CSVs in `evals/results_*.csv`.
+
+If every model call fails, both architectures degrade to a rules-only
+decision flagged `llm_unavailable` instead of erroring - the deterministic
+core is policy-complete on its own.
 
 ### Ship decision: **staged / 2-agent**
 

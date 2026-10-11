@@ -11,11 +11,11 @@ PUB-03,staged,yes,yes,yes,yes,17147,2,8,Same outcome as single
 PUB-04,staged,yes,yes,yes,yes,155132,2,8,Latency spike = free-tier retry wait
 PUB-05,staged,yes,yes,yes,yes,15577,2,8,Injection flagged by keyword screen + analyst judgment
 PUB-06,staged,yes,yes,yes,yes,18661,2,8,Same outcome as single
-MANUAL-1004,single,yes,yes,yes,yes,,3,8,Added legal_review_required (customer-PII AI) - additive caution
-MANUAL-1007,single,yes,yes,yes,yes,,3,8,Expired review + registry conflict both surfaced
-MANUAL-1008,single,yes,yes,yes,yes,,3,8,Existing company-wide TaskFlow seats surfaced as better path
-MANUAL-1010,single,yes,yes,yes,yes,,3,8,Clean Manager-only happy path
-MANUAL-1004,staged,yes,yes,yes,yes,,2,8,Limited-use AI + customer PII -> security + privacy
-MANUAL-1007,staged,yes,yes,yes,yes,,2,8,Expired review + registry conflict both surfaced
-MANUAL-1008,staged,yes,yes,yes,yes,,2,8,Correctly recommends reusing existing TaskFlow capacity
-MANUAL-1010,staged,yes,yes,yes,yes,,2,8,Manager only; added soft privacy note on a no-data request
+EXT-01,single,yes,yes,yes,yes,70419,3,8,Added legal_review_required (customer-PII AI) - additive caution
+EXT-02,single,yes,yes,yes,yes,24264,3,8,Expired review + registry conflict both surfaced
+EXT-03,single,yes,yes,yes,yes,44330,3,8,Existing company-wide TaskFlow seats surfaced as better path
+EXT-04,single,yes,yes,yes,yes,16793,3,8,Clean Manager-only happy path
+EXT-01,staged,yes,yes,yes,yes,16875,2,8,Limited-use AI + customer PII -> security + privacy
+EXT-02,staged,yes,yes,yes,yes,28880,2,8,Expired review + registry conflict both surfaced
+EXT-03,staged,yes,yes,yes,yes,54579,2,8,Correctly recommends reusing existing TaskFlow capacity
+EXT-04,staged,yes,yes,yes,yes,12374,2,8,Manager only; no-data request kept vendor PII flags off

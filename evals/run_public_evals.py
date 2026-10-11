@@ -65,11 +65,14 @@ def evaluate(decision: ProcurementDecision, expectations: dict) -> list[str]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--architecture', choices=['single','staged'], default='single')
+    parser.add_argument('--cases', default=str(ROOT/'evals'/'public_cases.json'),
+                        help='path to a cases JSON file (same schema as public_cases.json)')
     args = parser.parse_args()
 
-    cases = json.loads((ROOT/'evals'/'public_cases.json').read_text(encoding='utf-8'))
+    cases_path = Path(args.cases)
+    cases = json.loads(cases_path.read_text(encoding='utf-8'))
     rows = []
-    print(f"\nPublic evaluation - architecture={args.architecture}\n")
+    print(f"\nEvaluation - architecture={args.architecture} cases={cases_path.name}\n")
 
     for case in cases:
         start = time.perf_counter()
@@ -102,7 +105,7 @@ def main() -> None:
             })
 
     if rows:
-        out = ROOT/'evals'/f"results_{args.architecture}.csv"
+        out = ROOT/'evals'/f"results_{cases_path.stem}_{args.architecture}.csv"
         with out.open('w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=rows[0].keys())
             writer.writeheader(); writer.writerows(rows)
