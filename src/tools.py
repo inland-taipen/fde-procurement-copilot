@@ -37,38 +37,49 @@ def _req(request_id: str) -> dict:
 
 
 def get_request_context(request_id: str) -> dict:
-    """Load the request plus requester/department/budget context."""
+    """Load the request plus requester/department/budget context. Degrades
+    gracefully when a requester or department is absent from the CSVs."""
     req = _req(request_id)
-    employee = load_employees().query("employee_id == @req['requester_id']").iloc[0]
-    budget_rows = load_budgets().query("department == @employee['department']")
-    budget = budget_rows.iloc[0].to_dict() if len(budget_rows) else {}
+    rid = req.get("requester_id")
+    emp_rows = load_employees().query("employee_id == @rid")
+    employee = emp_rows.iloc[0].to_dict() if not emp_rows.empty else {}
+    department = employee.get("department")
+    budget_rows = (
+        load_budgets().query("department == @department") if department else None
+    )
+    budget = (
+        budget_rows.iloc[0].to_dict() if budget_rows is not None and not budget_rows.empty else {}
+    )
+    available = budget.get("available_usd")
     return {
         "tool": "get_request_context",
         "data": {
             "request": req,
             "requester": {
-                "employee_id": employee["employee_id"],
-                "name": employee["name"],
-                "department": employee["department"],
+                "employee_id": rid,
+                "name": employee.get("name"),
+                "department": department,
             },
             "budget": {
-                "annual_usd": int(budget["annual_software_budget_usd"]),
-                "committed_usd": int(budget["committed_usd"]),
-                "available_usd": int(budget["available_usd"]),
+                "annual_usd": int(budget["annual_software_budget_usd"]) if budget else None,
+                "committed_usd": int(budget["committed_usd"]) if budget else None,
+                "available_usd": int(available) if available is not None else None,
             },
         },
         "evidence": [
             _ev(
                 "request_record",
                 f"{req['request_id']}: {req['product_name']} from {req['vendor_name']} "
-                f"for {employee['name']} ({employee['department']})",
+                f"for {employee.get('name') or rid} ({department or 'unknown department'})",
                 req["request_id"],
             ),
             _ev(
                 "department_budgets.csv",
-                f"{employee['department']} has ${budget['available_usd']:,} available "
-                f"of ${budget['annual_software_budget_usd']:,} annual software budget",
-                employee["department"],
+                f"{department} has ${int(available):,} available "
+                f"of ${int(budget['annual_software_budget_usd']):,} annual software budget"
+                if budget
+                else f"No budget record found for department '{department or rid}'",
+                str(department or rid),
             ),
         ],
     }
@@ -115,16 +126,17 @@ def check_budget(request_id: str) -> dict:
     ctx = get_request_context(request_id)["data"]
     cost = ctx["request"].get("annual_cost_usd")
     available = ctx["budget"]["available_usd"]
-    dept = ctx["requester"]["department"]
-    if cost is None:
+    dept = ctx["requester"]["department"] or "the requester's department"
+    if cost is None or available is None:
+        why = "no annual cost provided" if cost is None else "no budget record for the department"
         return {
             "tool": "check_budget",
-            "data": {"within_budget": None, "cost": None, "available_usd": available},
+            "data": {"within_budget": None, "cost": cost, "available_usd": available},
             "evidence": [
                 _ev(
                     "policy_check",
-                    f"Budget check not possible: no annual cost provided "
-                    f"({dept} has ${available:,} available)",
+                    f"Budget check not possible: {why} "
+                    f"({dept} available budget: {available if available is None else f'${available:,}'})",
                     "procurement_policy.md section 2",
                 )
             ],
@@ -150,13 +162,16 @@ def find_catalog_overlap(request_id: str) -> dict:
     req = _req(request_id)
     catalog = load_software_catalog()
     matches = []
+    req_vendor = (req.get("vendor_name") or "").lower()
+    req_product = (req.get("product_name") or "").lower()
+    req_category = (req.get("category") or "").lower()
     for row in catalog.itertuples():
         reasons = []
-        if row.vendor_name.lower() == req["vendor_name"].lower():
+        if req_vendor and row.vendor_name.lower() == req_vendor:
             reasons.append("same vendor")
-        if row.product_name.lower() == req["product_name"].lower():
+        if req_product and row.product_name.lower() == req_product:
             reasons.append("same product")
-        if row.category.lower() == req["category"].lower():
+        if req_category and row.category.lower() == req_category:
             reasons.append("same category")
         if reasons:
             matches.append(

@@ -19,16 +19,17 @@ REFERENCE_DATE = date(2026, 9, 30)
 ASSESSMENT_VALID_DAYS = 365
 NEW_VENDOR_LEGAL_THRESHOLD_USD = 10_000
 
-SECURITY_DATA_LEVELS = {
-    "source_code",
-    "production_telemetry",
-    "confidential_documents",
-    "employee_pii",
-    "customer_pii",
-    "credentials",
-    "secrets",
-}
-PRIVACY_DATA_LEVELS = {"employee_pii", "customer_pii"}
+# Substring patterns, not an exact-match set: hidden cases may use novel
+# level names ("hr_records", "confidential_files") that still name sensitive
+# data. Over-matching is the safe direction - it only ever adds a review.
+SECURITY_ACCESS_PAT = re.compile(
+    r"pii|personal|confidential|credential|secret|source|code|production|"
+    r"telemetry|customer|employee|(?<![a-z])hr(?![a-z])",
+    re.IGNORECASE,
+)
+PRIVACY_ACCESS_PAT = re.compile(
+    r"pii|personal|customer|employee|(?<![a-z])hr(?![a-z])", re.IGNORECASE
+)
 SECURITY_INTEGRATION_PAT = re.compile(
     r"production|cloud|git|repository|source|codebase|credential|secret", re.IGNORECASE
 )
@@ -93,6 +94,11 @@ def derive_rulings(tool_outputs: dict[str, dict]) -> dict:
     injection = tool_outputs.get("scan_request_for_injection", {}).get("data", {})
     access = (context.get("request", {}).get("data_access_level") or "").lower()
 
+    # requester or department absent from the CSVs = material missing info
+    if context and context.get("requester", {}).get("department") is None:
+        flags.add("missing_information")
+        missing.append("requester/department record")
+
     # --- vendor posture: registry + external service, with conflict handling
     is_new_vendor = not registry or registry.get("procurement_status") == "New"
     reg_date = _iso_date(registry.get("security_review_date"))
@@ -131,10 +137,10 @@ def derive_rulings(tool_outputs: dict[str, dict]) -> dict:
         approvals.add("Security")
 
     # --- data sensitivity from the request itself
-    if access in SECURITY_DATA_LEVELS or access in {"unknown", ""}:
+    if access in {"unknown", ""} or SECURITY_ACCESS_PAT.search(access):
         flags.add("security_review_required")
         approvals.add("Security")
-    if access in PRIVACY_DATA_LEVELS:
+    if PRIVACY_ACCESS_PAT.search(access):
         flags.add("privacy_review_required")
         approvals.add("Privacy")
     integrations = context.get("request", {}).get("requested_integrations") or []
