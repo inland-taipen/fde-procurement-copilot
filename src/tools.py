@@ -387,7 +387,7 @@ _INJECTION_PATTERNS = re.compile(
 def scan_request_for_injection(request_id: str) -> dict:
     """Deterministic screen for instruction-like text inside business data.
 
-    ponytail: keyword/pattern ceiling - catches imperative override attempts
+    Known ceiling: keyword/pattern scan catches imperative override attempts
     but not paraphrases; the LLM analyst judges semantics on top, and all
     sensitive outputs are computed in code so a miss can only lose the flag,
     never grant an approval.
