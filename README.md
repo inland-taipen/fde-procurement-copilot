@@ -142,18 +142,68 @@ Start with a thin vertical slice. Get Architecture A working before building Arc
 
 ## Implementation
 
-Deterministic-first, LLM-last: `src/tools.py` (8 evidence tools),
-`src/rules.py` (policy engine + merge validator; reference date 2026-09-30),
-`src/agents.py` (both architectures over the shared core, raw `google-genai`
-with structured output + tool declarations, per-model quota fallback).
+**Deterministic-first, LLM-last.** Every check with exactly one right answer
+is computed by code; the LLM interprets and writes prose, and a final
+validator guarantees the model can only add caution - never remove a
+required control.
 
-- `architecture="staged"` - collect -> analyst -> writer, exactly 2 LLM calls
-- `architecture="single"` - one agentic tool loop (~3-4 LLM calls)
+| Layer | File | Role |
+|---|---|---|
+| Tools (8) | `src/tools.py` | request context, required-field check, budget check, catalog overlap, vendor registry, vendor-risk API, approval thresholds, injection screen. 7 deterministic + 1 HTTP. Each returns grounded `EvidenceItem`s. |
+| Policy engine | `src/rules.py` | `derive_rulings` turns tool outputs into flags/approvals/missing info (reference date 2026-09-30). `merge_decision` unions model output with the code ruling and forces `human_review_required`. |
+| Agents | `src/agents.py` | `staged` = collect -> analyst -> writer (2 LLM calls). `single` = one agentic tool loop (~3-4 calls). Raw `google-genai`, structured output, per-model quota fallback. |
+| Adapter | `src/solution.py` | `handle_request(request_id, architecture)` + telemetry. |
 
-LLM output can only add caution; derived approvals/flags are the floor and
-`human_review_required` is always true. See `templates/workflow_notes.md`
-for the diagram and `templates/architecture_decision.md` for the ship
-decision. Offline core check: `python -m unittest tests.test_rulings`.
+### Product workflow
+
+`run_local.py` starts the vendor-risk API (:8001) and the Streamlit UI
+(:8501). Pick a request + architecture in the sidebar, run the analysis:
+request details on the left, the `ProcurementDecision` (recommendation,
+evidence panel, approvals, missing info, risk flags, next step) on the
+right.
+
+### Assumptions
+
+- Date-based checks use the policy snapshot date **2026-09-30**, never the
+  machine clock.
+- Request text and vendor notes are untrusted business data; they can only
+  add a `prompt_injection_detected` flag, never change a rule.
+- An unavailable vendor-risk service is treated as "cannot verify" and
+  routes to Security - never inferred favourable.
+- A request with `data_access_level: none` does not trigger PII-derived
+  reviews even if the vendor's product line processes personal data.
+- Overlap is vendor/product/category equality in the catalog; it surfaces
+  an existing option, never auto-rejects.
+
+### Evaluation results (`evals/results_*.csv`, 6 public cases)
+
+| Metric | Single agent | Staged / 2-agent |
+|---|---:|---:|
+| Cases passing minimum checks | 6/6 | 6/6 |
+| Median latency | ~20.4 s | ~17.9 s |
+| Avg LLM calls | 3.2 | 2.0 |
+| Avg tool calls | 8.0 | 8.0 |
+
+Averages include free-tier quota retry waits. Four non-public requests
+(REQ-1004/1007/1008/1010) were also reviewed manually on both - see
+`evals/evaluation_results.csv`.
+
+### Ship decision: **staged / 2-agent**
+
+Same policy outcomes, ~40% fewer LLM calls, fixed shape (every tool always
+runs, so evidence coverage is guaranteed rather than model-dependent).
+Full argument: `templates/architecture_decision.md`. Diagram + trade-offs:
+`templates/workflow_notes.md`.
+
+### Known limitations
+
+- Keyword injection screen has a paraphrase ceiling; the LLM judgment
+  covers semantics, and approvals are computed in code regardless.
+- Catalog matching is equality-based, not semantic.
+- Free-tier Gemini quotas (~20 calls/day/model) slow eval runs; a model
+  fallback chain mitigates.
+
+Offline core check (no API key needed): `python -m unittest tests.test_rulings`.
 
 ## Useful files
 
