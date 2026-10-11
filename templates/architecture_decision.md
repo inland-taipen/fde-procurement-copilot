@@ -6,8 +6,8 @@ Ship the **staged / 2-agent** variant (`architecture="staged"`).
 
 ## Evidence
 
-Both architectures share one deterministic core: `src/tools.py` (8 tools,
-7 fully deterministic + the vendor-risk HTTP call) and `src/rules.py`
+Both architectures share one deterministic core: `src/tools.py` (9 tools,
+8 fully deterministic + the vendor-risk HTTP call) and `src/rules.py`
 (policy engine + a merge validator that unions model output with the code
 ruling and forces `human_review_required`). Only the LLM's role differs.
 
@@ -19,7 +19,7 @@ Results from `evals/run_public_evals.py` (6 public cases plus
 | Cases passing minimum checks | 10/10 | 10/10 |
 | Median latency (ms, public) | 20,421 | 17,904 |
 | Avg LLM calls | ~3.2 | 2.0 |
-| Avg tool calls | 8.0 | 8.0 |
+| Avg tool calls | 9.0 | 9.0 |
 | Policy failures found | 0 | 0 |
 
 Latency includes free-tier 429/503 retry waits; medians are the honest

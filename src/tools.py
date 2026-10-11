@@ -22,6 +22,7 @@ from src.data_access import (
     get_request,
     load_budgets,
     load_employees,
+    load_purchase_history,
     load_software_catalog,
     load_vendors,
 )
@@ -302,6 +303,51 @@ def get_vendor_risk(request_id: str) -> dict:
     }
 
 
+def find_prior_purchases(request_id: str) -> dict:
+    """Check purchase history for the same vendor/product. Evidence only -
+    a prior approved PO means this may be a renewal or duplicate spend,
+    which is context for a human, not an automatic flag."""
+    req = _req(request_id)
+    history = load_purchase_history()
+    vendor = (req.get("vendor_name") or "").lower()
+    product = (req.get("product_name") or "").lower()
+    matches = [
+        {
+            "purchase_id": row.purchase_id,
+            "department": row.department,
+            "product_name": row.product_name,
+            "vendor_name": row.vendor_name,
+            "annual_amount_usd": int(row.annual_amount_usd),
+            "status": row.status,
+            "purchase_date": row.purchase_date,
+        }
+        for row in history.itertuples()
+        if (vendor and row.vendor_name.lower() == vendor)
+        or (product and row.product_name.lower() == product)
+    ]
+    return {
+        "tool": "find_prior_purchases",
+        "data": {"matches": matches},
+        "evidence": [
+            _ev(
+                "purchase_history.csv",
+                f"Prior purchase {m['purchase_id']} ({m['purchase_date']}): "
+                f"{m['department']} bought {m['product_name']} at "
+                f"${m['annual_amount_usd']:,}/yr, status '{m['status']}'",
+                m["purchase_id"],
+            )
+            for m in matches
+        ]
+        or [
+            _ev(
+                "purchase_history.csv",
+                "No prior purchases for this vendor or product",
+                "purchase_history.csv",
+            )
+        ],
+    }
+
+
 def compute_approval_requirements(request_id: str) -> dict:
     """Deterministic financial approval thresholds (policy section 4)."""
     cost = _req(request_id).get("annual_cost_usd")
@@ -377,6 +423,7 @@ TOOLS = {
         check_required_fields,
         check_budget,
         find_catalog_overlap,
+        find_prior_purchases,
         lookup_vendor_registry,
         get_vendor_risk,
         compute_approval_requirements,

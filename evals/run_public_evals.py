@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 from src.contracts import ProcurementDecision
 from src.solution import handle_request
+from src.tools import TOOLS
 
 
 def norm(value: object) -> str:
@@ -28,7 +29,7 @@ def group_present(items: list[object], group: list[str]) -> bool:
     return any(any(norm(token) in item for item in texts) for token in group)
 
 
-def evaluate(decision: ProcurementDecision, expectations: dict) -> list[str]:
+def evaluate(decision: ProcurementDecision, expectations: dict, request_id: str) -> list[str]:
     failures: list[str] = []
 
     for group in expectations.get('required_approvals_any_groups', []):
@@ -59,6 +60,20 @@ def evaluate(decision: ProcurementDecision, expectations: dict) -> list[str]:
     if expected_human is not None and decision.human_review_required != expected_human:
         failures.append(f"human_review_required expected {expected_human}")
 
+    # --- grounding / trajectory integrity (architecture-agnostic) ---
+    if decision.request_id != request_id:
+        failures.append(f"decision is for {decision.request_id}, not the requested case")
+    tel = decision.telemetry
+    if tel:
+        unknown_tools = set(tel.tool_names) - set(TOOLS)
+        if unknown_tools:
+            failures.append(f"telemetry names unregistered tools: {sorted(unknown_tools)}")
+        if tel.tool_calls < len(tel.tool_names):
+            failures.append("tool_calls inconsistent with tool_names")
+    ungrounded = [e.source for e in decision.evidence if not e.source or not e.finding]
+    if ungrounded:
+        failures.append(f"{len(ungrounded)} evidence items lack a source or finding")
+
     return failures
 
 
@@ -80,7 +95,7 @@ def main() -> None:
             raw = handle_request(case['request_id'], architecture=args.architecture)
             decision = raw if isinstance(raw, ProcurementDecision) else ProcurementDecision.model_validate(raw)
             latency_ms = (time.perf_counter() - start) * 1000
-            failures = evaluate(decision, case['expectations'])
+            failures = evaluate(decision, case['expectations'], case['request_id'])
             passed = not failures
             tel = decision.telemetry
             print(f"{'PASS' if passed else 'FAIL'}  {case['case_id']}  {case['title']}  ({latency_ms:.0f} ms)")

@@ -149,10 +149,18 @@ required control.
 
 | Layer | File | Role |
 |---|---|---|
-| Tools (8) | `src/tools.py` | request context, required-field check, budget check, catalog overlap, vendor registry, vendor-risk API, approval thresholds, injection screen. 7 deterministic + 1 HTTP. Each returns grounded `EvidenceItem`s. |
+| Tools (9) | `src/tools.py` | request context, required-field check, budget check, catalog overlap, prior-purchase history, vendor registry, vendor-risk API, approval thresholds, injection screen. 8 deterministic + 1 HTTP. Each returns grounded `EvidenceItem`s. |
 | Policy engine | `src/rules.py` | `derive_rulings` turns tool outputs into flags/approvals/missing info (reference date 2026-09-30). `merge_decision` unions model output with the code ruling and forces `human_review_required`. |
 | Agents | `src/agents.py` | `staged` = collect -> analyst -> writer (2 LLM calls). `single` = one agentic tool loop (~3-4 calls). Raw `google-genai`, structured output, per-model quota fallback. |
 | Adapter | `src/solution.py` | `handle_request(request_id, architecture)` + telemetry. |
+
+```text
+Request --> 9 TOOLS (8 deterministic + vendor-risk HTTP)
+        --> RULES: approvals / flags / missing info (reference date 2026-09-30)
+        --> LLM layer   A: single agent tool loop  |  B: analyst -> writer
+        --> merge_decision: deterministic floor (LLM adds caution, can't remove)
+        --> ProcurementDecision --> human approvers
+```
 
 ### Product workflow
 
@@ -182,7 +190,7 @@ right.
 | Public cases passing (6) | 6/6 | 6/6 |
 | Extended cases passing (4) | 4/4 | 4/4 |
 | Avg LLM calls | ~3.2 | 2.0 |
-| Tool calls per case | 8 | 8 |
+| Tool calls per case | 9 | 9 |
 
 `python evals/run_public_evals.py --architecture staged` (public set) and
 `--cases evals/extended_cases.json` (4 extra requests I wrote expectations
@@ -206,7 +214,9 @@ Full argument: `templates/architecture_decision.md`. Diagram + trade-offs:
   covers semantics, and approvals are computed in code regardless.
 - Catalog matching is equality-based, not semantic.
 - Free-tier Gemini quotas (~20 calls/day/model) slow eval runs; a model
-  fallback chain mitigates.
+  fallback chain mitigates. Staged CSVs were regenerated after the
+  purchase-history tool landed; the single-agent full rerun was pending
+  quota at writing (a live one-case run verified its 9-tool path).
 
 Offline core check (no API key needed): `python -m unittest tests.test_rulings`.
 

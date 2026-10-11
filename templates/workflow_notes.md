@@ -16,10 +16,10 @@ and writes prose. It can add caution but can never remove a required control:
 Purchase Request (untrusted business data)
       |
       v
-TOOLS (src/tools.py)                      <- deterministic + 1 HTTP call
+TOOLS (src/tools.py)                      <- 8 deterministic + 1 HTTP call
   get_request_context / check_required_fields / check_budget /
-  find_catalog_overlap / lookup_vendor_registry / get_vendor_risk /
-  compute_approval_requirements / scan_request_for_injection
+  find_catalog_overlap / find_prior_purchases / lookup_vendor_registry /
+  get_vendor_risk / compute_approval_requirements / scan_request_for_injection
       |
       v
 RULES (src/rules.py -> derive_rulings)    <- pure code, policy sections 1-10
@@ -37,14 +37,14 @@ ProcurementDecision -> human reviewers
 ## Architecture A - single agent (`architecture="single"`)
 
 One Gemini call in a tool loop (`run_single_agent`): the model receives all
-8 tools as function declarations, chooses which to call (in practice it
+9 tools as function declarations, chooses which to call (in practice it
 batches all of them in one turn), then a second structured call produces the
 decision draft. The ruling is derived only from tools the agent actually
 called - skipping evidence is a real, measurable failure mode.
 
 ## Architecture B - staged / 2-agent (`architecture="staged"`)
 
-Prompt-chain workflow (`run_staged`): code runs all 8 tools unconditionally
+Prompt-chain workflow (`run_staged`): code runs all 9 tools unconditionally
 -> agent 1 ("analyst") judges what rules cannot (credible gap vs catalog,
 sensitivity interpretation, injection suspicion) -> agent 2 ("writer")
 composes the draft. Fixed shape, exactly 2 LLM calls.
